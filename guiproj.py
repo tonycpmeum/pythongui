@@ -3,6 +3,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import Menu
+from tkinter import ttk
 
 data_path = Path("./data/")
 if not os.path.exists(data_path):
@@ -27,22 +28,16 @@ class MyGUI:
       self.menu_files.add_cascade(label="Open", menu=submenu_open)
 
       self.root.config(menu=self.menu_bar)
-      # End Main Menu Bar
 
+      # tabs
+      self.create_tab_control()
+      self.create_data_entry_content()
+      self.create_data_analysis_content()
+
+      self.tab_control.pack(expand=1, fill="both")
       #spinbox
       # combobox
 
-      self.label = tk.Label(self.root, text="type something", font=("Helvatica", 18))
-      self.label.pack(padx=10, pady=10)
-
-      self.input_filename = tk.Entry(self.root, font=("Monospace", 14), width=10)
-      self.input_filename.pack(padx=10, pady=10)
-
-      self.input_content = tk.Entry(self.root, font=("Monospace", 14), width=10)
-      self.input_content.pack(padx=10, pady=10)
-
-      self.button_save = tk.Button(self.root, text="Save", font=("Monospace", 14), command=lambda: [self.saveFile(), self.updateSubmenu(submenu_open)], activebackground="orange", activeforeground="purple", bg="grey")
-      self.button_save.pack(padx=10, pady=10)
 
       self.root.mainloop()
 
@@ -58,12 +53,6 @@ class MyGUI:
       with open(file_path, 'r') as read_file:
          text = json.load(read_file)
          file_stem = file_path.stem
-         self.label.config(text=text)
-         
-         self.input_content.delete(0, 'end')
-         self.input_filename.delete(0, 'end')
-         self.input_content.insert(0, text)
-         self.input_filename.insert(0, file_stem)
 
          self.root.title(f"Something - {file_stem}")
 
@@ -79,6 +68,25 @@ class MyGUI:
             json.dump(input_msg, write_file)
 
       self.root.title(f"Something - {file_name}")
+   
+   def create_tab_control(self):
+      self.tab_control = ttk.Notebook(self.root, padding="12") 
+      self.data_entry_tab = ttk.Frame(self.tab_control)
+      self.data_analysis_tab = ttk.Frame(self.tab_control)
       
+      self.tab_control.add(self.data_entry_tab, text="Data Entry")
+      self.tab_control.add(self.data_analysis_tab, text="Data Analysis")
+      
+   def create_data_entry_content(self):
+      label_one = tk.Label(self.data_entry_tab, text="Content for Data Entry")
+      label_two = tk.Label(self.data_entry_tab, text="Content Two for Data Entry")
+      self.data_entry_tab.grid_columnconfigure(0, weight=1)
+      self.data_entry_tab.grid_columnconfigure(1, weight=1)
+      label_one.grid(row=0, column=0, pady=10)
+      label_two.grid(row=0, column=1, pady=10)
+
+   def create_data_analysis_content(self):
+      entry = tk.Entry(self.data_analysis_tab)
+      entry.pack(padx=10, pady=10)
 
 MyGUI()
