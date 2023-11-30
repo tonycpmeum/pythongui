@@ -11,6 +11,9 @@ data_path = Path("./data/")
 if not os.path.exists(data_path):
    os.makedirs(data_path)
 
+def keystoint(x):
+   return {int(k): v for k, v in x.items()}
+
 months_dict: dict = {index: month for index, month in enumerate(calendar.month_name) if month}
 
 class MyGUI:
@@ -119,10 +122,11 @@ class MyGUI:
 
    def loadFile(self, file_path: Path):
       with open(file_path, 'r') as read_file:
-         self.data_json = json.load(read_file)
+         self.data_json = json.load(read_file, object_hook=keystoint)
 
       file_stem = file_path.stem
       self.root.title(f"Expenses Tracker - {file_stem}")
+
       self.create_tab_control()
 
    def saveFile(self):
