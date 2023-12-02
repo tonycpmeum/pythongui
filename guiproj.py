@@ -19,13 +19,16 @@ months_dict: dict = {index: month for index, month in enumerate(calendar.month_n
 class MyGUI:
    def __init__(self):
       self.root = tk.Tk(className="Expenses Tracker")
-      self.root.geometry("800x800")
+      self.root.geometry("600x800")
+      self.root.resizable(width=False, height=False)
+      self.root.columnconfigure(0, weight=1)
+      self.root.rowconfigure(0, weight=1)
 
       # Main Menu Bar
       self.menu_bar = Menu(self.root)
       self.menu_files = Menu(self.menu_bar, tearoff=0)
       self.menu_bar.add_cascade(label="Files", menu=self.menu_files)
-      self.menu_bar.add_command(label="Save", state="disabled", command= lambda: [self.saveFile(), self.updateSubmenu(self.submenu_open)])
+      self.menu_bar.add_command(label="Save", state="disabled", command= lambda: [self.saveFile(1), self.updateSubmenu(self.submenu_open)])
    
       # Files Menu
       self.menu_files.add_command(label="New", command=self.newFile)
@@ -43,7 +46,6 @@ class MyGUI:
 
       #spinbox
       # combobox
-
       self.root.mainloop()
 
    def updateSubmenu(self, submenu_open: Menu):
@@ -66,7 +68,7 @@ class MyGUI:
       fn_label.grid(row=0, column=0, sticky='w', pady=12)
 
       fn_entry = tk.Entry(new_file_window)
-      fn_entry.grid(row=0, column=1, sticky='we')
+      fn_entry.grid(row=0, column=1, sticky='ew')
 
       month_label = tk.Label(new_file_window, text="Starting Month: ")
       month_label.grid(row=1, column=0, sticky='w', pady=12)
@@ -75,7 +77,7 @@ class MyGUI:
       month_selection = ttk.Combobox(new_file_window, textvariable=n, state="readonly", values=tuple(months_dict.values()))
       month_selection.current(datetime.datetime.now().month - 1)
       month_value: int = datetime.datetime.now().month
-      month_selection.grid(row=1, column=1, sticky='we')
+      month_selection.grid(row=1, column=1, sticky='ew')
 
       def on_month_change(*args):
          nonlocal month_value
@@ -91,7 +93,7 @@ class MyGUI:
       year_selection = ttk.Combobox(new_file_window, textvariable=m, state="readonly", values=tuple(i for i in range(2020, curr_year + 1)))
       year_selection.current(curr_year - 2020)
       year_value: int = curr_year
-      year_selection.grid(row=2, column=1, sticky='we')
+      year_selection.grid(row=2, column=1, sticky='ew')
 
       def on_year_change(*args):
          nonlocal year_value
@@ -118,9 +120,11 @@ class MyGUI:
             new_file_window.destroy()
 
       submit_button = tk.Button(new_file_window, text="Create", command=on_submit)
-      submit_button.grid(row=3, column=0, columnspan=2, pady=12, sticky='we')
+      submit_button.grid(row=3, column=0, columnspan=2, pady=12, sticky='ew')
 
    def loadFile(self, file_path: Path):
+      self.file_name = os.path.splitext(os.path.basename(file_path))[0]
+
       with open(file_path, 'r') as read_file:
          self.data_json = json.load(read_file, object_hook=keystoint)
 
@@ -129,11 +133,13 @@ class MyGUI:
 
       self.create_tab_control()
 
-   def saveFile(self):
+   def saveFile(self, status: int = None):
       file_path = data_path / (self.file_name + '.json')
       with open(file_path, 'w') as write_file:
          json.dump(self.data_json, write_file)
       self.updateSubmenu(self.submenu_open)
+      # if status == 1: messagebox.showinfo('saved', 'pee pee poo poo')
+      self.menu_bar.entryconfig("Save", state="disabled")
    
    def create_tab_control(self):
       if self.tab_control.winfo_ismapped(): 
@@ -142,10 +148,13 @@ class MyGUI:
 
       self.data_entry_tab = ttk.Frame(self.tab_control)
       self.data_analysis_tab = ttk.Frame(self.tab_control)
-      
+
+      self.data_entry_tab.columnconfigure(0, weight=1)
+      self.data_analysis_tab.columnconfigure(0, weight=1)
+
       self.tab_control.add(self.data_entry_tab, text="Data Entry")
       self.tab_control.add(self.data_analysis_tab, text="Data Analysis")
-      self.tab_control.pack(expand=1, fill="both")
+      self.tab_control.grid(row=0, column=0, sticky='nsew')
       
       self.create_data_entry_content()
       self.create_data_analysis_content()
@@ -158,6 +167,7 @@ class MyGUI:
       top_frame.columnconfigure(3, weight=1)
       top_frame.columnconfigure(4, weight=5)
       top_frame.columnconfigure(5, weight=5)
+      top_frame.grid(row=0, column=0, sticky='nsew')
 
       m_label = tk.Label(top_frame, text="Month: ")
       y_label = tk.Label(top_frame, text="Year: ")
@@ -179,6 +189,9 @@ class MyGUI:
       m_selection['values'] = tuple(months_dict[m] for m in self.data_json[curr_y])
       m_selection.current(len(self.data_json[curr_y]) - 1)
 
+      m_selection.grid(row=0, column=1, sticky='w')
+      y_selection.grid(row=0, column=3, sticky='w')
+
       def on_y_change(*args):
          nonlocal curr_y, curr_m
          y_var.set(y_selection.get())
@@ -187,6 +200,7 @@ class MyGUI:
          if curr_m not in self.data_json[curr_y]:
             curr_m = list(self.data_json[curr_y])[-1]
             m_selection.current(len(self.data_json[curr_y]) - 1)
+         self.update_input(curr_y, curr_m)
       y_selection.bind("<<ComboboxSelected>>", on_y_change)
 
       def on_m_change(*args):
@@ -196,10 +210,8 @@ class MyGUI:
             for key, val in dict_.items():
                if val == val_search: return key
          curr_m = get_key(months_dict, m_var.get())
+         self.update_input(curr_y, curr_m)
       m_selection.bind("<<ComboboxSelected>>", on_m_change)
-
-      m_selection.grid(row=0, column=1, sticky='w')
-      y_selection.grid(row=0, column=3, sticky='w')
 
       def fn_new_month():
          nonlocal curr_m, curr_y
@@ -220,14 +232,112 @@ class MyGUI:
          m_selection['values'] = tuple(months_dict[m] for m in self.data_json[final_year])
          m_selection.current(len(self.data_json[final_year]) - 1)
 
-         print(f"curr_m: {type(curr_m)}, curr_y: {type(curr_y)}")
-         print(self.data_json)
+         self.update_input(curr_y, curr_m)
 
       new_month_btn = tk.Button(top_frame, text="New Month", width=15, command=fn_new_month)
       new_month_btn.grid(row=0, column=4, columnspan=2, sticky='n')
-      
-      self.data_entry_tab.columnconfigure(0, weight=1)
-      top_frame.grid(row=0, column=0, sticky='we')
+
+      print(f"Year: {curr_y}, Month: {curr_m}")
+      self.update_input(curr_y, curr_m)
+
+   def update_input(self, curr_year: int, curr_month: int):
+      curr_year_months = self.data_json[curr_year]
+      curr_month_data = curr_year_months[curr_month]
+      num_of_days = calendar.monthrange(curr_year, curr_month)[1]
+
+      def frame_grid_config(frame: tk.Frame):
+         frame.columnconfigure(2, weight=1)
+         frame.columnconfigure(3, weight=1)
+
+      bottom_frame = tk.Frame(self.data_entry_tab, padx=40, pady=10)
+      bottom_frame.columnconfigure(0, weight=1)
+      bottom_frame.grid(row=1, column=0, sticky='nsew')
+
+      label_frame = tk.Frame(bottom_frame, pady=10)
+      label_frame.grid(row=0, column=0, sticky='ew')
+      frame_grid_config(label_frame)
+
+      date_label = tk.Label(label_frame, text="Date", anchor='w', width=7)
+      amount_label = tk.Label(label_frame, text="Amount", anchor='w', width=15)
+      title_label = tk.Label(label_frame, text="Title")
+      details_label = tk.Label(label_frame, text="Details")
+
+      date_label.grid(row=0, column=0, sticky='w')
+      amount_label.grid(row=0, column=1, sticky='w')
+      title_label.grid(row=0, column=2, sticky='w')
+      details_label.grid(row=0, column=3, sticky='w')
+
+      title_details_dropdown = []
+
+      for year in self.data_json.values():
+         for month in year.values():
+            for day in month.values():
+               for entry in day:
+                  if len(entry) >= 2:
+                     title_details_dropdown.append(entry)
+
+
+      def frame_focus_out(event: tk.Event):
+         self.menu_bar.entryconfig("Save", state="normal")
+         print("Frame lost focus")
+         for i, child in enumerate(event.widget.winfo_children()):
+            print(f"Child {i}: {child}")
+
+         # widget = event.widget
+         # column_index = widget.grid_info()['column']
+         # month = self.data_json[curr_year][curr_month]
+         # input_val = widget.get()
+         # if input_val == '': return
+
+         # if column_index == 0:
+         #    input_val = int(input_val)
+         # elif column_index == 1:
+         #    input_val = format(float(input_val), '.2f')
+         
+      def date_focus_out(event: tk.Event):
+         widget = event.widget
+         val = widget.get()
+         if not val.isdigit() or val.startswith('0'):
+            widget.set("")
+         elif int(val) not in range(1, num_of_days + 1):
+            widget.set(num_of_days)
+         
+      def amount_focus_out(event: tk.Event):
+         widget = event.widget
+         try:
+            float_val = round(float(widget.get()), 2)
+            float_val = format(float_val, '.2f')
+            widget.delete(0, tk.END)
+            widget.insert(0, float_val)
+         except:
+            widget.delete(0, tk.END)
+
+      details_json = {
+         "Title": [ 
+            [ ], [ ]  
+         ]
+      }
+
+
+      for i in range(1, 25):
+         input_frame = tk.Frame(bottom_frame)
+         input_frame.grid(row=i, column=0, sticky="we")
+         frame_grid_config(input_frame)
+         input_frame.bind("<FocusOut>", frame_focus_out)
+
+         date_input = ttk.Combobox(input_frame, width=5, values=tuple(i for i in range(1, num_of_days + 1)))
+         date_input.bind("<FocusOut>", date_focus_out)
+         date_input.grid(row=i, column=0, sticky='ew')
+
+         amount_input = tk.Entry(input_frame, width=15)
+         amount_input.bind("<FocusOut>", amount_focus_out)
+         amount_input.grid(row=i, column=1, sticky='ew')
+
+         title_input = ttk.Combobox(input_frame)
+         title_input.grid(row=i, column=2, sticky='ew')
+
+         details_input = ttk.Combobox(input_frame)
+         details_input.grid(row=i, column=3, sticky='ew')
 
 
    def create_data_analysis_content(self):
