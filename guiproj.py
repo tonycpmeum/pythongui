@@ -25,7 +25,7 @@ class MyGUI:
       self.menu_bar = Menu(self.root)
       self.menu_files = Menu(self.menu_bar, tearoff=0)
       self.menu_bar.add_cascade(label="Files", menu=self.menu_files)
-      self.menu_bar.add_command(label="Save", state="disabled", command= lambda: [self.saveFile(), self.updateSubmenu(self.submenu_open)])
+      self.menu_bar.add_command(label="Save", state="disabled", command= lambda: [self.saveFile(), self.load_entries(), self.updateSubmenu(self.submenu_open)])
    
       # Files Menu
       self.menu_files.add_command(label="New", command=self.newFile)
@@ -227,7 +227,7 @@ class MyGUI:
             m_selection.current(len(self.data_json[self.curr_year]) - 1)
          
          self.unpack_json_to_lists()
-         self.update_input()
+         self.load_entries()
 
       def on_m_change(*args):
          self.pack_lists_to_json()
@@ -238,7 +238,7 @@ class MyGUI:
          self.curr_month = get_key(months_dict, m_var.get())
 
          self.unpack_json_to_lists()
-         self.update_input()
+         self.load_entries()
 
       def fn_new_month():
          self.pack_lists_to_json()
@@ -260,7 +260,7 @@ class MyGUI:
          m_selection.current(len(self.data_json[final_year]) - 1)
 
          self.unpack_json_to_lists()
-         self.update_input()
+         self.load_entries()
 
       y_selection.bind("<<ComboboxSelected>>", on_y_change)
       m_selection.bind("<<ComboboxSelected>>", on_m_change)
@@ -268,11 +268,9 @@ class MyGUI:
       new_month_btn.grid(row=0, column=4, columnspan=2, sticky='n')
 
       self.unpack_json_to_lists()
-      self.update_input()
+      self.load_entries()
 
-   def update_input(self):
-      num_of_days = calendar.monthrange(self.curr_year, self.curr_month)[1]
-
+   def load_entries(self):
       def frame_grid_config(frame: tk.Frame):
          frame.columnconfigure(2, weight=1)
          frame.columnconfigure(3, weight=1)
@@ -294,6 +292,8 @@ class MyGUI:
       amount_label.grid(row=0, column=1, sticky='w')
       title_label.grid(row=0, column=2, sticky='w')
       details_label.grid(row=0, column=3, sticky='w')
+
+      num_of_days = calendar.monthrange(self.curr_year, self.curr_month)[1]
 
       def frame_focus_out(event: tk.Event, current_data: list):
          frame = event.widget
@@ -327,42 +327,114 @@ class MyGUI:
             float_val = format(float_val, '.2f')
             widget.delete(0, tk.END)
             widget.insert(0, float_val)
-         except:
+         except ValueError:
             widget.delete(0, tk.END)
-      
-      for i in range(1, 25):
+
+      entry_amount = 24
+      for i in range(entry_amount):
          input_frame = tk.Frame(bottom_frame)
-         input_frame.grid(row=i, column=0, sticky="we")
+         input_frame.grid(row=(i + 1), column=0, sticky="we")
          frame_grid_config(input_frame)
-
-         current_data = []
-
-         if i > len(self.curr_data_lists):
-            self.curr_data_lists.append(current_data)
-         else:
-            current_data = self.curr_data_lists[i - 1]
 
          date_input = ttk.Combobox(input_frame, width=5, values=tuple(i for i in range(1, num_of_days + 1)))
          amount_input = tk.Entry(input_frame, width=15)
          title_input = ttk.Combobox(input_frame)
          details_input = ttk.Combobox(input_frame)
 
-         if len(current_data) > 0:
-            date_input.set(current_data[0])
-            amount_input.insert(0, current_data[1])
-            title_input.set(current_data[2])
-            details_input.set(current_data[3])
+         date_input.grid(row=0, column=0, sticky='ew')
+         amount_input.grid(row=0, column=1, sticky='ew')
+         title_input.grid(row=0, column=2, sticky='ew')
+         details_input.grid(row=0, column=3, sticky='ew')
 
-         input_frame.bind("<FocusOut>", lambda event, data = current_data: frame_focus_out(event, data))
-         date_input.bind("<FocusOut>", lambda event: date_focus_out(event))
-         amount_input.bind("<FocusOut>", lambda event: amount_focus_out(event))
+      def get_inputframe_by_row(row) -> tk.Frame:
+         slaves = bottom_frame.grid_slaves()
+         slaves.reverse()
+         input_frame: tk.Frame = slaves[row]
+         return input_frame
 
-         date_input.grid(row=i, column=0, sticky='ew')
-         amount_input.grid(row=i, column=1, sticky='ew')
-         title_input.grid(row=i, column=2, sticky='ew')
-         details_input.grid(row=i, column=3, sticky='ew')
+      def get_widget_by_col(col, container: tk.Frame):
+         for child in container.winfo_children():
+            if child.grid_info()['column'] == col:
+               return child
 
+      def page(page_no: int):
+         nonlocal entry_amount
 
+         for i in range(entry_amount):
+            current_data = []
+            if (i + (page_no - 1) * entry_amount) + 1 > len(self.curr_data_lists):
+               self.curr_data_lists.append(current_data)
+            else:
+               current_data = self.curr_data_lists[i + (page_no - 1) * entry_amount]
+
+            row = i + 1
+            get_input_frame = lambda r=row: get_inputframe_by_row(r)
+            input_frame = get_input_frame()
+
+            date_input: ttk.Combobox = get_widget_by_col(0, input_frame)
+            amount_input: tk.Entry = get_widget_by_col(1, input_frame)
+            title_input: ttk.Combobox = get_widget_by_col(2, input_frame)
+            details_input: ttk.Combobox = get_widget_by_col(3, input_frame)
+
+            date_input.set("")
+            amount_input.delete(0, tk.END)
+            title_input.set("")
+            details_input.set("")
+
+            input_frame.bind("<FocusOut>", lambda event, data = current_data: frame_focus_out(event, data))
+            date_input.bind("<FocusOut>", lambda event: date_focus_out(event))
+            amount_input.bind("<FocusOut>", lambda event: amount_focus_out(event))
+
+            if len(current_data) > 0:
+               date_input.set(current_data[0])
+               amount_input.insert(0, current_data[1])
+               title_input.set(current_data[2])
+               details_input.set(current_data[3])
+
+      total_pages = len(self.curr_data_lists) // (entry_amount + 1) + 1
+      curr_page = total_pages
+      page_navi_frame = tk.Frame(bottom_frame)
+      page_navi_frame.grid(row=entry_amount + 2, column=0, sticky='ew', padx=20, pady=30)
+      page_navi_frame.grid_columnconfigure(3, weight=1)
+
+      page_label = tk.Label(page_navi_frame, text="Page: ")
+      page_entry = tk.Entry(page_navi_frame, width=3)
+      page_total = tk.Label(page_navi_frame, text=f" /  {total_pages} ")
+      page_entry.insert(0, curr_page)
+
+      def new_page_fn():
+         nonlocal total_pages, curr_page
+         total_pages += 1
+         curr_page = total_pages
+
+         page_entry.delete(0, tk.END)
+         page_entry.insert(0, curr_page)
+         page(curr_page)
+         page_total.config(text=f" /  {total_pages} ")
+
+      def page_event(event: tk.Event):
+         widget: tk.Entry = event.widget
+         try:
+            if widget.get() == "": return
+            page_val = int(widget.get())
+            if page_val > total_pages: 
+               page_val = total_pages
+               widget.delete(0, tk.END)
+               widget.insert(0, page_val)
+            page(page_val)
+         except ValueError:
+            widget.delete(0, tk.END)
+            widget.insert(0, curr_page)
+
+      new_page_btn = tk.Button(page_navi_frame, text="New Page", width=15, command=new_page_fn)
+      page_entry.bind('<KeyRelease>', page_event)
+
+      page_label.grid(row=0, column=0)
+      page_entry.grid(row=0, column=1)
+      page_total.grid(row=0, column=2)
+      new_page_btn.grid(row=0, column=3, sticky='e')
+      
+      page(curr_page)
 
    def create_data_analysis_content(self):
       entry = tk.Entry(self.data_analysis_tab)
