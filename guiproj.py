@@ -40,6 +40,7 @@ class MyGUI:
 
       self.file_name: str = ""
       self.data_json: dict = {}
+      self.details_dropdown: dict = {}
 
       self.curr_year: int = 0
       self.curr_month: int = 0
@@ -270,11 +271,30 @@ class MyGUI:
       self.unpack_json_to_lists()
       self.load_entries()
 
+   def details_dropdown_val(self):
+      for year in self.data_json.values():
+         for month in year.values():
+            for day in month.values():
+               for entries in day:
+                  if entries[1] in self.details_dropdown:
+                     if entries[2] in self.details_dropdown[entries[1]]: continue
+                     self.details_dropdown[entries[1]].append(entries[2])
+                  else:
+                     self.details_dropdown[entries[1]] = [entries[2]]
+      
+      sorted_key = sorted(list(self.details_dropdown.keys()))
+      for key, val in self.details_dropdown.items():
+         val.sort()
+      self.details_dropdown = { i: self.details_dropdown[i] for i in sorted_key }
+
+      print(self.details_dropdown)
+
    def load_entries(self):
       def frame_grid_config(frame: tk.Frame):
          frame.columnconfigure(2, weight=1)
          frame.columnconfigure(3, weight=1)
 
+      # Labels
       bottom_frame = tk.Frame(self.data_entry_tab, padx=40, pady=10)
       bottom_frame.columnconfigure(0, weight=1)
       bottom_frame.grid(row=1, column=0, sticky='nsew')
@@ -293,7 +313,25 @@ class MyGUI:
       title_label.grid(row=0, column=2, sticky='w')
       details_label.grid(row=0, column=3, sticky='w')
 
+      #Entries
       num_of_days = calendar.monthrange(self.curr_year, self.curr_month)[1]
+      self.details_dropdown_val()
+
+      entry_amount = 24
+      for i in range(entry_amount):
+         input_frame = tk.Frame(bottom_frame)
+         input_frame.grid(row=(i + 1), column=0, sticky="we")
+         frame_grid_config(input_frame)
+
+         date_input = ttk.Combobox(input_frame, width=5, values=tuple(i for i in range(1, num_of_days + 1)))
+         amount_input = tk.Entry(input_frame, width=15)
+         title_input = ttk.Combobox(input_frame, values=tuple(self.details_dropdown))
+         details_input = ttk.Combobox(input_frame)
+
+         date_input.grid(row=0, column=0, sticky='ew')
+         amount_input.grid(row=0, column=1, sticky='ew')
+         title_input.grid(row=0, column=2, sticky='ew')
+         details_input.grid(row=0, column=3, sticky='ew')
 
       def frame_focus_out(event: tk.Event, current_data: list):
          frame = event.widget
@@ -312,40 +350,6 @@ class MyGUI:
             elif i == 1: current_data.append(child_input)
             elif i in (2, 3): current_data.append(child_input)
 
-      def date_focus_out(event: tk.Event):
-         widget = event.widget
-         val = widget.get()
-         if not val.isdigit() or val.startswith('0'):
-            widget.set("")
-         elif int(val) not in range(1, num_of_days + 1):
-            widget.set(num_of_days)
-         
-      def amount_focus_out(event: tk.Event):
-         widget = event.widget
-         try:
-            float_val = round(float(widget.get()), 2)
-            float_val = format(float_val, '.2f')
-            widget.delete(0, tk.END)
-            widget.insert(0, float_val)
-         except ValueError:
-            widget.delete(0, tk.END)
-
-      entry_amount = 24
-      for i in range(entry_amount):
-         input_frame = tk.Frame(bottom_frame)
-         input_frame.grid(row=(i + 1), column=0, sticky="we")
-         frame_grid_config(input_frame)
-
-         date_input = ttk.Combobox(input_frame, width=5, values=tuple(i for i in range(1, num_of_days + 1)))
-         amount_input = tk.Entry(input_frame, width=15)
-         title_input = ttk.Combobox(input_frame)
-         details_input = ttk.Combobox(input_frame)
-
-         date_input.grid(row=0, column=0, sticky='ew')
-         amount_input.grid(row=0, column=1, sticky='ew')
-         title_input.grid(row=0, column=2, sticky='ew')
-         details_input.grid(row=0, column=3, sticky='ew')
-
       def get_inputframe_by_row(row) -> tk.Frame:
          slaves = bottom_frame.grid_slaves()
          slaves.reverse()
@@ -356,6 +360,62 @@ class MyGUI:
          for child in container.winfo_children():
             if child.grid_info()['column'] == col:
                return child
+
+      def date_focus_out(event: tk.Event):
+         widget: ttk.Combobox = event.widget
+         val = widget.get()
+         if not val.isdigit() or val.startswith('0'):
+            widget.set("")
+         elif int(val) not in range(1, num_of_days + 1):
+            widget.set(num_of_days)
+         
+      def amount_focus_out(event: tk.Event):
+         widget: tk.Entry = event.widget
+         try:
+            float_val = round(float(widget.get()), 2)
+            float_val = format(float_val, '.2f')
+            widget.delete(0, tk.END)
+            widget.insert(0, float_val)
+         except ValueError:
+            widget.delete(0, tk.END)
+      
+      def capitalize_entry(event: tk.Event):
+         widget: ttk.Combobox = event.widget
+         string = widget.get().capitalize()
+         widget.set(string)
+
+      def update_detail_dropdown(update_title_dropdown = False):
+         for i in range(1, 25):
+            input_frame = get_inputframe_by_row(i)
+            title_input = get_widget_by_col(2, input_frame)
+            details_input = get_widget_by_col(3, input_frame)
+
+            title_val = title_input.get()
+            if update_title_dropdown:
+               title_input['values'] = tuple(self.details_dropdown)
+            if title_val == '':
+               details_input['values'] = []
+               continue
+            details_input['values'] = tuple(self.details_dropdown[title_val])
+
+      def details_focus_out(event: tk.Event, title_input: ttk.Combobox):
+         capitalize_entry(event)
+         widget = event.widget
+         deet_val = widget.get()
+         title_val = title_input.get()
+
+         if deet_val and deet_val not in self.details_dropdown[title_val]:
+            self.details_dropdown[title_val].append(deet_val)
+         update_detail_dropdown()
+
+      def title_focus_out(event: tk.Event):
+         capitalize_entry(event)
+         widget = event.widget
+         title_val = widget.get()
+
+         if title_val and title_val not in self.details_dropdown:
+            self.details_dropdown[title_val] = [ title_val ]
+         update_detail_dropdown(True)
 
       def page(page_no: int):
          nonlocal entry_amount
@@ -384,12 +444,18 @@ class MyGUI:
             input_frame.bind("<FocusOut>", lambda event, data = current_data: frame_focus_out(event, data))
             date_input.bind("<FocusOut>", lambda event: date_focus_out(event))
             amount_input.bind("<FocusOut>", lambda event: amount_focus_out(event))
+            title_input.bind("<FocusOut>", lambda event: title_focus_out(event))
+            details_input.bind("<FocusOut>", lambda event, tE = title_input: details_focus_out(event, tE))
 
             if len(current_data) > 0:
                date_input.set(current_data[0])
-               amount_input.insert(0, current_data[1])
+               amount_input.insert(0, format(float(current_data[1]), '.2f'))
                title_input.set(current_data[2])
                details_input.set(current_data[3])
+
+            title_val = title_input.get()
+            if title_val: details_input['values'] = tuple(self.details_dropdown[title_val])
+
 
       total_pages = len(self.curr_data_lists) // (entry_amount + 1) + 1
       curr_page = total_pages
