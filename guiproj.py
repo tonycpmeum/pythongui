@@ -75,32 +75,29 @@ class MyGUI:
       month_label = tk.Label(new_file_window, text="Starting Month: ")
       month_label.grid(row=1, column=0, sticky='w', pady=12)
 
-      n = tk.StringVar()
-      month_selection = ttk.Combobox(new_file_window, textvariable=n, state="readonly", values=tuple(months_dict.values()))
+      month_selection = ttk.Combobox(new_file_window, state="readonly", values=tuple(months_dict.values()))
       month_selection.current(datetime.datetime.now().month - 1)
       month_value: int = datetime.datetime.now().month
       month_selection.grid(row=1, column=1, sticky='ew')
 
-      def on_month_change(*args):
+      def on_month_change(event: tk.Event):
          nonlocal month_value
-         n.set(month_selection.get())
-         month_value = month_selection['values'].index(n.get()) + 1
+         widget = event.widget
+         month_value = widget['values'].index(widget.get()) + 1
       month_selection.bind("<<ComboboxSelected>>", on_month_change)
 
       year_label = tk.Label(new_file_window, text="Starting Year: ")
       year_label.grid(row=2, column=0, sticky='w', pady=12)
 
-      m = tk.StringVar()
       curr_year = datetime.datetime.now().year
-      year_selection = ttk.Combobox(new_file_window, textvariable=m, state="readonly", values=tuple(i for i in range(2020, curr_year + 1)))
+      year_selection = ttk.Combobox(new_file_window, state="readonly", values=tuple(i for i in range(2020, curr_year + 1)))
       year_selection.current(curr_year - 2020)
       year_value: int = curr_year
       year_selection.grid(row=2, column=1, sticky='ew')
 
-      def on_year_change(*args):
+      def on_year_change(event: tk.Event):
          nonlocal year_value
-         m.set(year_selection.get())
-         year_value = int(m.get())
+         year_value = int(year_selection.get())
       year_selection.bind("<<ComboboxSelected>>", on_year_change)
 
       def valid_filename(file_name: str):
@@ -113,12 +110,9 @@ class MyGUI:
          if not valid_filename(fn_entry.get()):
             messagebox.showerror("New File Error!", "File name must not contain space or special characters.")
          else:
-            self.file_name = fn_entry.get()
-            self.root.title(f"Expenses Tracker - {self.file_name}")
-            self.data_json = { year_value: { month_value: { } } }
-            
-            self.create_tab_control()
-            self.menu_bar.entryconfig("Save", state="normal")
+            self.data_json = { year_value: { month_value: {} } }
+            file_path = data_path / (fn_entry.get() + '.json')
+            self.loadFile(file_path)
             new_file_window.destroy()
 
       submit_button = tk.Button(new_file_window, text="Create", command=on_submit)
@@ -128,17 +122,17 @@ class MyGUI:
       self.file_name = os.path.splitext(os.path.basename(file_path))[0]
       def keystoint(x): return {int(k): v for k, v in x.items()}
 
-      with open(file_path, 'r') as read_file:
-         self.data_json = json.load(read_file, object_hook=keystoint)
+      if os.path.exists(file_path):
+         with open(file_path, 'r') as read_file:
+            self.data_json = json.load(read_file, object_hook=keystoint)
 
-      file_stem = file_path.stem
-      self.root.title(f"Expenses Tracker - {file_stem}")
-
+      self.root.title(f"Expenses Tracker - {file_path.stem}")
       self.create_tab_control()
 
    def saveFile(self):
       self.pack_lists_to_json()
       file_path = data_path / (self.file_name + '.json')
+
       with open(file_path, 'w') as write_file:
          json.dump(self.data_json, write_file)
       self.updateSubmenu(self.submenu_open)
@@ -287,8 +281,6 @@ class MyGUI:
          val.sort()
       self.details_dropdown = { i: self.details_dropdown[i] for i in sorted_key }
 
-      print(self.details_dropdown)
-
    def load_entries(self):
       def frame_grid_config(frame: tk.Frame):
          frame.columnconfigure(2, weight=1)
@@ -404,7 +396,7 @@ class MyGUI:
          deet_val = widget.get()
          title_val = title_input.get()
 
-         if deet_val and deet_val not in self.details_dropdown[title_val]:
+         if deet_val and title_val and deet_val not in self.details_dropdown[title_val]:
             self.details_dropdown[title_val].append(deet_val)
          update_detail_dropdown()
 
@@ -503,7 +495,90 @@ class MyGUI:
       page(curr_page)
 
    def create_data_analysis_content(self):
-      entry = tk.Entry(self.data_analysis_tab)
-      entry.pack(padx=10, pady=10)
+      top_frame = tk.Frame(self.data_analysis_tab, padx=25, pady=20)
+      top_frame.grid(row=0, column=0, sticky='nsew')
+      top_frame.grid_columnconfigure(0, weight=1)
+      top_frame.grid_columnconfigure(1, weight=1)
+      top_frame.grid_columnconfigure(2, weight=1)
+
+      duration_frame = tk.Frame(top_frame)
+      period_frame = tk.Frame(top_frame)
+      sortby_frame = tk.Frame(top_frame)
+      duration_frame.grid(row=0, column=0, sticky='w')
+      period_frame.grid(row=0, column=1, sticky='w')
+      sortby_frame.grid(row=0, column=2, sticky='w')
+
+      duration_label = tk.Label(duration_frame, text="Duration: ")
+      period_label = tk.Label(period_frame, text="Period: ")
+      sortby_label = tk.Label(sortby_frame, text="Sort By: ")
+
+      duration_label.grid(row=0, column=0)
+      period_label.grid(row=0, column=0)
+      sortby_label.grid(row=0, column=0)
+   
+      period_values = ["ALLTIME"]
+      for year in self.data_json:
+         for month in self.data_json[year]:
+            period_values.append(f"{month} / {year}")
+
+      duration_dropdown = ttk.Combobox(duration_frame, state='readonly', width=7, values=("Month", "ALLTIME"))
+      period_dropdown = ttk.Combobox(period_frame, state='readonly', width=10, values=period_values)
+      sortby_dropdown = ttk.Combobox(sortby_frame, state='readonly', width=7, values=("Title", "Details"))
+
+      duration_dropdown.current(0)
+      period_dropdown.current(0)
+      sortby_dropdown.current(0)
+      duration_dropdown.grid(row=0, column=1)
+      period_dropdown.grid(row=0, column=1)
+      sortby_dropdown.grid(row=0, column=1)
+
+      def duration_event(event: tk.Event):
+         widget = event.widget
+         if widget.get() == "ALLTIME":
+            period_dropdown['values'] = period_values[0]
+            period_dropdown.set(period_values[0])
+         else:
+            period_dropdown['values'] = period_values
+            period_dropdown.current(0)
+         
+         self.render_analysis_content(duration_dropdown.get(), period_dropdown.get(), sortby_dropdown.get())
+
+      def period_event(event: tk.Event):
+         self.render_analysis_content(duration_dropdown.get(), period_dropdown.get(), sortby_dropdown.get())
+
+      def sortby_event(event: tk.Event):
+         self.render_analysis_content(duration_dropdown.get(), period_dropdown.get(), sortby_dropdown.get())
+
+      duration_dropdown.bind("<<ComboboxSelected>>", duration_event)
+      period_dropdown.bind("<<ComboboxSelected>>", period_event)
+      sortby_dropdown.bind("<<ComboboxSelected>>", sortby_event)
+
+      self.render_analysis_content(duration_dropdown.get(), period_dropdown.get(), sortby_dropdown.get())
+
+   def render_analysis_content(self, duration: str, period: str, sort: str):
+      frame = tk.Frame(self.data_analysis_tab, padx=35)
+      frame.grid(row=1, column=0, sticky='nsew')
+
+      print(f"{duration}, {period}, {sort}")
+      def get_entries(func):
+         for year in self.data_json.values():
+            for month in year.values():
+               for entries in month.values():
+                  for entry in entries:
+                     func(entry)
+
+      all_titles = []
+      def update_title(entry: list): 
+         if sort == "Title" and entry[1] not in all_titles: 
+            all_titles.append(entry[1])
+         if sort == "Details" and entry[2] not in all_titles:
+            all_titles.append(entry[2])
+      get_entries(update_title)
+
+      for i, title in enumerate(all_titles):
+         label_title = tk.Label(frame, text=title)
+         label_title.grid(row=i + 1, column=0, sticky='w')
+
+
 
 MyGUI()
