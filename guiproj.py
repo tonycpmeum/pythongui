@@ -557,28 +557,71 @@ class MyGUI:
 
    def render_analysis_content(self, duration: str, period: str, sort: str):
       frame = tk.Frame(self.data_analysis_tab, padx=35)
+      frame.columnconfigure(0, weight=1)
+      frame.columnconfigure(1, weight=1)
+      frame.columnconfigure(2, weight=1)
       frame.grid(row=1, column=0, sticky='nsew')
 
-      print(f"{duration}, {period}, {sort}")
       def get_entries(func):
+         if period == "ALLTIME":
+            for year in self.data_json.values():
+               for month in year.values():
+                  for entries in month.values():
+                     for entry in entries:
+                        func(entry)
+         else:
+            month = int(period.split("/")[0].strip())
+            year = int(period.split("/")[1].strip())
+            for entries in self.data_json[year][month].values():
+               for entry in entries:
+                  func(entry)
+
+      chosen_entries: dict = {}
+      total = 0
+      total_period = 1
+
+      def get_sort(entry: list):
+         index = 1 if sort == "Title" else 2
+
+         if entry[index] not in chosen_entries: 
+            chosen_entries[entry[index]] = entry[0]
+         else: chosen_entries[entry[index]] += entry[0]
+
+         nonlocal total
+         total += entry[0]
+
+      get_entries(get_sort)
+
+      chosen_entries_list = list(chosen_entries.items())
+      chosen_entries_list.sort(key=lambda item: item[1], reverse=True)
+      sorted_entries = { k: v for k, v in chosen_entries_list }
+
+      if duration == "Month" and period == "ALLTIME":
          for year in self.data_json.values():
-            for month in year.values():
-               for entries in month.values():
-                  for entry in entries:
-                     func(entry)
+            for month in year:
+               total_period += 1
+         total_period -= 1
 
-      all_titles = []
-      def update_title(entry: list): 
-         if sort == "Title" and entry[1] not in all_titles: 
-            all_titles.append(entry[1])
-         if sort == "Details" and entry[2] not in all_titles:
-            all_titles.append(entry[2])
-      get_entries(update_title)
+      last_row = 0
+      for i, (string, amt) in enumerate(sorted_entries.items()):
+         label_string = tk.Label(frame, text=string)
+         label_string.grid(row=i, column=0, sticky='w')
 
-      for i, title in enumerate(all_titles):
-         label_title = tk.Label(frame, text=title)
-         label_title.grid(row=i + 1, column=0, sticky='w')
+         label_amt = tk.Label(frame, text=format((amt / total_period), '.2f'))
+         label_amt.grid(row=i, column=1, sticky='w')
 
+         percentage = (amt / total_period) / (total / total_period) * 100
+         label_percentage = tk.Label(frame, text=f"{format(percentage, '.2f')}%")
+         label_percentage.grid(row=i, column=2, sticky='w')
+         
+         last_row = i + 1
+      
+      label_total = tk.Label(frame, text="Total: ")
+      label_amount_total = tk.Label(frame, text=format((total / total_period), '.2f'))
+      label_percentage_total = tk.Label(frame, text="100.00%")
 
+      label_total.grid(row=last_row, column=0, sticky='w', pady=15)
+      label_amount_total.grid(row=last_row, column=1, sticky='w')
+      label_percentage_total.grid(row=last_row, column=2, sticky='w')
 
 MyGUI()
